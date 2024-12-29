@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+  apache-proxy:
+    build:
+      context: ./httpd
+    ports:
+      - "8086:8086"  # Expose proxy on port 8086
+    volumes:
+      - ./httpd/docker-cache:/var/cache/apache2/docker
+      - ./httpd/logs:/usr/local/apache2/logs  # Mount logs folder
+    environment:
+      - DOCKER_UPSTREAM=https://registry-1.docker.io  # Define upstream registry for Docker proxy
+    restart: always
+    networks:
+      - proxy-network
+    entrypoint: ["httpd", "-D", "FOREGROUND"]  # Keep the container running for testing
+
+
+
+  docker-client:
+    image: docker:latest  # Use the latest Docker client image
+    container_name: docker-client
+    environment:
+      - DOCKER_HOST=tcp://apache-proxy:8086  # Point Docker client to Apache proxy
+      - DOCKER_OPTS=--disable-legacy-registry=true  # Disable legacy registry API
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for interaction with the Docker daemon
+    networks:
+      - proxy-network
+    entrypoint: ["tail", "-f", "/dev/null"]  # Keep the container running for testing
+
+networks:
+  proxy-network:
+    driver: bridge
